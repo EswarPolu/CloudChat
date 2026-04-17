@@ -2,6 +2,7 @@ from flask import Flask, request, Response, jsonify, send_from_directory
 from flask_cors import CORS
 import anthropic
 from google import genai
+from openai import OpenAI
 import os
 import json
 import glob
@@ -45,6 +46,18 @@ PROVIDERS = {
         "models": [
             {"id": "gemini-2.5-flash", "name": "Gemini 2.5 Flash", "default": True},
             {"id": "gemini-2.5-pro", "name": "Gemini 2.5 Pro"},
+        ],
+    },
+    "nvidia": {
+        "name": "NVIDIA NIM",
+        "models": [
+            {"id": "meta/llama-3.1-8b-instruct", "name": "Llama 3.1 8B", "default": True},
+            {"id": "meta/llama-3.1-70b-instruct", "name": "Llama 3.1 70B"},
+            {"id": "meta/llama-3.1-405b-instruct", "name": "Llama 3.1 405B"},
+            {"id": "mistralai/mistral-large-2-instruct", "name": "Mistral Large 2"},
+            {"id": "google/gemma-3-27b-it", "name": "Gemma 3 27B"},
+            {"id": "deepseek-ai/deepseek-v3.2", "name": "DeepSeek V3.2"},
+            {"id": "qwen/qwen3.5-397b-a17b", "name": "Qwen 3.5 397B"},
         ],
     },
 }
@@ -152,6 +165,19 @@ def _auto_configure_from_env():
         except Exception as e:
             print(f"Failed to configure Bedrock from env: {e}")
 
+    # Check for NVIDIA API key
+    nvidia_key = os.environ.get("NVIDIA_API_KEY")
+    if nvidia_key:
+        try:
+            _client = OpenAI(base_url="https://integrate.api.nvidia.com/v1", api_key=nvidia_key)
+            _provider = "nvidia"
+            _auth_method = "env"
+            _auth_error = None
+            print("Auto-configured NVIDIA NIM provider from NVIDIA_API_KEY")
+            return
+        except Exception as e:
+            print(f"Failed to configure NVIDIA from env: {e}")
+
 
 # ─── Auth Endpoints ──────────────────────────────────────────────────────────
 
@@ -231,6 +257,19 @@ def auth_provider():
             _sso_profile = None
             _auth_error = None
             return jsonify({"success": True, "provider": "gemini", "method": "api_key"})
+
+        elif provider_name == "nvidia":
+            # NVIDIA NIM via API key (OpenAI-compatible)
+            api_key = data.get("api_key", "").strip()
+            if not api_key:
+                return jsonify({"success": False, "error": "API key is required"})
+
+            _client = OpenAI(base_url="https://integrate.api.nvidia.com/v1", api_key=api_key)
+            _provider = "nvidia"
+            _auth_method = "api_key"
+            _sso_profile = None
+            _auth_error = None
+            return jsonify({"success": True, "provider": "nvidia", "method": "api_key"})
 
     except Exception as e:
         return jsonify({"success": False, "error": str(e)})
@@ -478,6 +517,24 @@ def chat():
                 for chunk in response:
                     if chunk.text:
                         yield f"data: {json.dumps({'text': chunk.text})}\n\n"
+
+                yield "data: [DONE]\n\n"
+
+            elif _provider == "nvidia":
+                # NVIDIA NIM streaming (OpenAI-compatible API)
+                stream = _client.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    stream=True,
+                )
+
+                for chunk in stream:
+                    if not getattr(chunk, "choices", None):
+                        continue
+                    if chunk.choices[0].delta.content is not None:
+                        yield f"data: {json.dumps({'text': chunk.choices[0].delta.content})}\n\n"
 
                 yield "data: [DONE]\n\n"
 

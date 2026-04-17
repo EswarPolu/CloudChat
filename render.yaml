@@ -21,3 +21,5 @@ services:
         sync: false
       - key: AWS_REGION
         value: us-east-1
+      - key: NVIDIA_API_KEY
+        sync: false
