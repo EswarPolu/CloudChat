@@ -30,7 +30,7 @@ CloudChat is an open-source, production-ready AI chatbot application with a prem
 
 ```
 cloudchat/
-├── frontend/
+├── docs/
 │   └── index.html              # Single-page web app (GitHub Pages)
 ├── backend/
 │   ├── server.py               # Flask API server
@@ -68,7 +68,7 @@ The application will start on port 5000. Enter your API keys in the UI to begin 
 2. Navigate to **Settings** > **Pages** in your repository
 3. Under **Source**, select:
    - Branch: `main`
-   - Folder: `/frontend`
+   - Folder: `/docs`
 4. Click **Save**
 5. Your frontend will be live at `https://<username>.github.io/cloudchat`
 
@@ -78,7 +78,7 @@ The application will start on port 5000. Enter your API keys in the UI to begin 
 2. Connect your GitHub repository
 3. Render will auto-detect configuration from `render.yaml`
 4. Set environment variables in the Render dashboard (see table below)
-5. Update `API_BASE_URL` in `frontend/index.html` to your Render backend URL
+5. Update `API_BASE_URL` in `docs/index.html` to your Render backend URL
 
 **Important**: Render's free tier sleeps after 15 minutes of inactivity. The first request after sleep may take up to 30 seconds to respond.
 
@@ -181,7 +181,7 @@ python server.py
 # Open the URL in your browser to access the UI
 ```
 
-For frontend-only changes, you can edit `frontend/index.html` and refresh your browser. For backend changes, restart the Flask server.
+For frontend-only changes, you can edit `docs/index.html` and refresh your browser. For backend changes, restart the Flask server.
 
 ## Troubleshooting
 

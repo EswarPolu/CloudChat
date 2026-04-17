@@ -553,7 +553,7 @@ def chat():
 @app.route("/")
 def index():
     """Serve frontend or API info."""
-    frontend_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "frontend")
+    frontend_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs")
     index_path = os.path.join(frontend_dir, "index.html")
 
     if os.path.exists(index_path):
