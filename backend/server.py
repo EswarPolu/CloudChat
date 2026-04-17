@@ -68,6 +68,7 @@ NVIDIA_FALLBACK_ORDER = [
 ]
 
 CONVERSATIONS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "conversations")
+IS_LOCAL = os.environ.get("RENDER") is None  # Render sets RENDER=true automatically
 
 # ─── Auth State ──────────────────────────────────────────────────────────────
 
@@ -374,68 +375,68 @@ def health():
     })
 
 
-# ─── Conversation History ────────────────────────────────────────────────────
+# ─── Conversation History (local dev only) ──────────────────────────────────
+
+if IS_LOCAL:
+    @app.route("/api/conversations")
+    def list_conversations():
+        """List all saved conversations."""
+        convos = []
+        for filepath in glob.glob(os.path.join(CONVERSATIONS_DIR, "*.json")):
+            try:
+                with open(filepath) as f:
+                    data = json.load(f)
+                    convos.append({
+                        "id": data["id"],
+                        "title": data.get("title", "Untitled"),
+                        "createdAt": data.get("createdAt"),
+                        "updatedAt": data.get("updatedAt"),
+                        "messageCount": len(data.get("messages", [])),
+                    })
+            except (json.JSONDecodeError, KeyError):
+                continue
+        convos.sort(key=lambda c: c.get("updatedAt", 0), reverse=True)
+        return jsonify({"conversations": convos})
 
 
-@app.route("/api/conversations")
-def list_conversations():
-    """List all saved conversations."""
-    convos = []
-    for filepath in glob.glob(os.path.join(CONVERSATIONS_DIR, "*.json")):
-        try:
-            with open(filepath) as f:
-                data = json.load(f)
-                convos.append({
-                    "id": data["id"],
-                    "title": data.get("title", "Untitled"),
-                    "createdAt": data.get("createdAt"),
-                    "updatedAt": data.get("updatedAt"),
-                    "messageCount": len(data.get("messages", [])),
-                })
-        except (json.JSONDecodeError, KeyError):
-            continue
-    convos.sort(key=lambda c: c.get("updatedAt", 0), reverse=True)
-    return jsonify({"conversations": convos})
+    @app.route("/api/conversations/<conv_id>")
+    def get_conversation(conv_id):
+        """Get a single conversation by ID."""
+        safe_id = _sanitize_conv_id(conv_id)
+        if not safe_id:
+            return jsonify({"error": "Invalid conversation ID"}), 400
+        filepath = os.path.join(CONVERSATIONS_DIR, f"{safe_id}.json")
+        if not os.path.exists(filepath):
+            return jsonify({"error": "Conversation not found"}), 404
+        with open(filepath) as f:
+            return jsonify(json.load(f))
 
 
-@app.route("/api/conversations/<conv_id>")
-def get_conversation(conv_id):
-    """Get a single conversation by ID."""
-    safe_id = _sanitize_conv_id(conv_id)
-    if not safe_id:
-        return jsonify({"error": "Invalid conversation ID"}), 400
-    filepath = os.path.join(CONVERSATIONS_DIR, f"{safe_id}.json")
-    if not os.path.exists(filepath):
-        return jsonify({"error": "Conversation not found"}), 404
-    with open(filepath) as f:
-        return jsonify(json.load(f))
+    @app.route("/api/conversations", methods=["POST"])
+    def save_conversation():
+        """Save or update a conversation."""
+        data = request.json
+        conv_id = data.get("id") or f"conv_{uuid.uuid4().hex[:12]}"
+        safe_id = _sanitize_conv_id(conv_id)
+        if not safe_id:
+            return jsonify({"error": "Invalid conversation ID"}), 400
+        data["id"] = safe_id
+        filepath = os.path.join(CONVERSATIONS_DIR, f"{safe_id}.json")
+        with open(filepath, "w") as f:
+            json.dump(data, f, indent=2)
+        return jsonify({"id": safe_id, "title": data.get("title", "Untitled")})
 
 
-@app.route("/api/conversations", methods=["POST"])
-def save_conversation():
-    """Save or update a conversation."""
-    data = request.json
-    conv_id = data.get("id") or f"conv_{uuid.uuid4().hex[:12]}"
-    safe_id = _sanitize_conv_id(conv_id)
-    if not safe_id:
-        return jsonify({"error": "Invalid conversation ID"}), 400
-    data["id"] = safe_id
-    filepath = os.path.join(CONVERSATIONS_DIR, f"{safe_id}.json")
-    with open(filepath, "w") as f:
-        json.dump(data, f, indent=2)
-    return jsonify({"id": safe_id, "title": data.get("title", "Untitled")})
-
-
-@app.route("/api/conversations/<conv_id>", methods=["DELETE"])
-def delete_conversation(conv_id):
-    """Delete a conversation."""
-    safe_id = _sanitize_conv_id(conv_id)
-    if not safe_id:
-        return jsonify({"error": "Invalid conversation ID"}), 400
-    filepath = os.path.join(CONVERSATIONS_DIR, f"{safe_id}.json")
-    if os.path.exists(filepath):
-        os.remove(filepath)
-    return jsonify({"success": True})
+    @app.route("/api/conversations/<conv_id>", methods=["DELETE"])
+    def delete_conversation(conv_id):
+        """Delete a conversation."""
+        safe_id = _sanitize_conv_id(conv_id)
+        if not safe_id:
+            return jsonify({"error": "Invalid conversation ID"}), 400
+        filepath = os.path.join(CONVERSATIONS_DIR, f"{safe_id}.json")
+        if os.path.exists(filepath):
+            os.remove(filepath)
+        return jsonify({"success": True})
 
 
 # ─── Chat (SSE Streaming) ───────────────────────────────────────────────────
@@ -593,7 +594,8 @@ def index():
 # ─── Startup ─────────────────────────────────────────────────────────────────
 
 
-os.makedirs(CONVERSATIONS_DIR, exist_ok=True)
+if IS_LOCAL:
+    os.makedirs(CONVERSATIONS_DIR, exist_ok=True)
 _auto_configure_from_env()
 
 if __name__ == "__main__":
