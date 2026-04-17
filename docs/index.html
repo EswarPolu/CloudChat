@@ -484,6 +484,25 @@
 
 
   <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- ══════════════════ LOADING OVERLAY ═══════════════════════════════ -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+  <div id="loading-overlay" class="fixed inset-0 overlay-bg z-[60] flex items-center justify-center p-4">
+    <div class="text-center">
+      <div class="w-16 h-16 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-primary to-primary-container flex items-center justify-center shadow-xl">
+        <span class="material-symbols-outlined text-white text-[32px]" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
+      </div>
+      <div class="flex items-center justify-center gap-2 mb-3">
+        <div class="typing-dot"></div>
+        <div class="typing-dot"></div>
+        <div class="typing-dot"></div>
+      </div>
+      <p id="loading-text" class="text-on-surface font-headline font-semibold text-lg">Connecting to server...</p>
+      <p class="text-on-surface-variant text-sm font-body mt-2">This may take up to 30 seconds on first load</p>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
   <!-- ══════════════════ SETTINGS DRAWER ═══════════════════════════════ -->
   <!-- ═══════════════════════════════════════════════════════════════════ -->
 
@@ -803,28 +822,47 @@
     // ═══════════════════════════════════════════════════════════════════
 
     async function checkAuth() {
-      try {
-        const res = await fetch(API_BASE_URL + '/api/auth-status');
-        const data = await res.json();
-        state.provider = data.provider;
-        state.authMethod = data.method;
-        state.authProfile = data.profile;
-        state.authRegion = data.region || 'us-east-1';
-        state.isAuthenticated = !!data.provider;
+      const loadingOverlay = $('loading-overlay');
+      const loadingText = $('loading-text');
+      const maxRetries = 3;
+      const delays = [2000, 5000, 10000];
 
-        if (state.isAuthenticated) {
-          renderAuthConnected();
-          authOverlay.classList.add('hidden');
-          await fetchModels();
-        } else {
-          renderAuthDisconnected();
-          authOverlay.classList.remove('hidden');
-          await fetchProviders();
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+          const res = await fetch(API_BASE_URL + '/api/auth-status');
+          const data = await res.json();
+          state.provider = data.provider;
+          state.authMethod = data.method;
+          state.authProfile = data.profile;
+          state.authRegion = data.region || 'us-east-1';
+          state.isAuthenticated = !!data.provider;
+
+          loadingOverlay.classList.add('hidden');
+
+          if (state.isAuthenticated) {
+            renderAuthConnected();
+            authOverlay.classList.add('hidden');
+            await fetchModels();
+          } else {
+            renderAuthDisconnected();
+            authOverlay.classList.remove('hidden');
+            await fetchProviders();
+          }
+          return;
+        } catch (err) {
+          if (attempt < maxRetries) {
+            loadingOverlay.classList.remove('hidden');
+            loadingText.textContent = attempt === 0
+              ? 'Waking up server...'
+              : `Still connecting... (attempt ${attempt + 1}/${maxRetries})`;
+            await new Promise(r => setTimeout(r, delays[attempt]));
+          } else {
+            console.error('Auth check failed after retries:', err);
+            loadingOverlay.classList.add('hidden');
+            renderAuthDisconnected();
+            authOverlay.classList.remove('hidden');
+          }
         }
-      } catch (err) {
-        console.error('Auth check failed:', err);
-        renderAuthDisconnected();
-        authOverlay.classList.remove('hidden');
       }
     }
 
@@ -981,7 +1019,8 @@
       const providerNames = {
         bedrock: 'AWS Bedrock',
         anthropic: 'Anthropic Claude',
-        gemini: 'Google Gemini'
+        gemini: 'Google Gemini',
+        nvidia: 'NVIDIA NIM'
       };
 
       $('status-provider').textContent = providerNames[state.provider] || 'Connected';
@@ -1285,6 +1324,14 @@
                 return;
               }
 
+              if (data.info) {
+                contentEl.innerHTML = `<div class="p-3 bg-secondary-container rounded-xl flex items-center gap-2 mb-2">
+                  <span class="material-symbols-outlined text-on-surface-variant text-[16px]">swap_horiz</span>
+                  <span class="text-xs text-on-surface-variant font-body">${escHtml(data.info)}</span>
+                </div>`;
+                fullText = '';
+              }
+
               if (data.guardrail) {
                 contentEl.innerHTML += `<div class="mt-4 p-4 bg-error-container rounded-xl flex items-center gap-3">
                   <span class="material-symbols-outlined text-error">shield</span>
@@ -1385,6 +1432,13 @@
                 contentEl.innerHTML = `<div class="p-4 bg-error-container rounded-xl"><span class="text-sm">${escHtml(data.error)}</span></div>`;
                 state.isStreaming = false;
                 return;
+              }
+              if (data.info) {
+                contentEl.innerHTML = `<div class="p-3 bg-secondary-container rounded-xl flex items-center gap-2 mb-2">
+                  <span class="material-symbols-outlined text-on-surface-variant text-[16px]">swap_horiz</span>
+                  <span class="text-xs text-on-surface-variant font-body">${escHtml(data.info)}</span>
+                </div>`;
+                fullText = '';
               }
               if (data.text) {
                 fullText += data.text;

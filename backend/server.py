@@ -51,16 +51,21 @@ PROVIDERS = {
     "nvidia": {
         "name": "NVIDIA NIM",
         "models": [
-            {"id": "meta/llama-3.1-8b-instruct", "name": "Llama 3.1 8B", "default": True},
-            {"id": "meta/llama-3.1-70b-instruct", "name": "Llama 3.1 70B"},
-            {"id": "meta/llama-3.1-405b-instruct", "name": "Llama 3.1 405B"},
+            {"id": "meta/llama-3.3-70b-instruct", "name": "Llama 3.3 70B", "default": True},
+            {"id": "meta/llama-3.1-8b-instruct", "name": "Llama 3.1 8B"},
             {"id": "mistralai/mistral-large-2-instruct", "name": "Mistral Large 2"},
             {"id": "google/gemma-3-27b-it", "name": "Gemma 3 27B"},
             {"id": "deepseek-ai/deepseek-v3.2", "name": "DeepSeek V3.2"},
-            {"id": "qwen/qwen3.5-397b-a17b", "name": "Qwen 3.5 397B"},
         ],
     },
 }
+
+NVIDIA_FALLBACK_ORDER = [
+    "meta/llama-3.3-70b-instruct",
+    "meta/llama-3.1-8b-instruct",
+    "mistralai/mistral-large-2-instruct",
+    "google/gemma-3-27b-it",
+]
 
 CONVERSATIONS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "conversations")
 
@@ -521,22 +526,38 @@ def chat():
                 yield "data: [DONE]\n\n"
 
             elif _provider == "nvidia":
-                # NVIDIA NIM streaming (OpenAI-compatible API)
-                stream = _client.chat.completions.create(
-                    model=model,
-                    messages=messages,
-                    temperature=temperature,
-                    max_tokens=max_tokens,
-                    stream=True,
-                )
+                # NVIDIA NIM streaming with fallback
+                models_to_try = [model] + [m for m in NVIDIA_FALLBACK_ORDER if m != model]
+                last_error = None
 
-                for chunk in stream:
-                    if not getattr(chunk, "choices", None):
+                for attempt_model in models_to_try:
+                    try:
+                        if attempt_model != model:
+                            yield f"data: {json.dumps({'info': f'Switching to {attempt_model}...'})}\n\n"
+
+                        stream = _client.chat.completions.create(
+                            model=attempt_model,
+                            messages=messages,
+                            temperature=temperature,
+                            max_tokens=max_tokens,
+                            stream=True,
+                        )
+
+                        for chunk in stream:
+                            if not getattr(chunk, "choices", None):
+                                continue
+                            if chunk.choices[0].delta.content is not None:
+                                yield f"data: {json.dumps({'text': chunk.choices[0].delta.content})}\n\n"
+
+                        yield "data: [DONE]\n\n"
+                        last_error = None
+                        break
+                    except Exception as fallback_err:
+                        last_error = fallback_err
                         continue
-                    if chunk.choices[0].delta.content is not None:
-                        yield f"data: {json.dumps({'text': chunk.choices[0].delta.content})}\n\n"
 
-                yield "data: [DONE]\n\n"
+                if last_error:
+                    yield f"data: {json.dumps({'error': f'All models failed. Last error: {last_error}'})}\n\n"
 
             else:
                 yield f"data: {json.dumps({'error': f'Unknown provider: {_provider}'})}\n\n"
