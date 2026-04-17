@@ -1,0 +1,1710 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>CloudChat — AI Conversations</title>
+  <meta name="description" content="Premium AI chat interface powered by AWS Bedrock, Claude & Gemini"/>
+
+  <!-- External Resources -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet"/>
+
+  <!-- Tailwind Configuration -->
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            'primary': '#864e00',
+            'primary-container': '#d4840a',
+            'on-primary': '#ffffff',
+            'tertiary': '#6332e4',
+            'tertiary-container': '#b7a3ff',
+            'surface': '#f6f6ff',
+            'surface-container': '#e2e7ff',
+            'surface-container-low': '#eef0ff',
+            'surface-container-lowest': '#ffffff',
+            'surface-container-high': '#d4dcf5',
+            'surface-container-highest': '#d1dcff',
+            'on-surface': '#272e42',
+            'on-surface-variant': '#535b71',
+            'inverse-surface': '#060e20',
+            'inverse-on-surface': '#d9e2f8',
+            'secondary-container': '#d4e1f5',
+            'error': '#b02500',
+            'error-container': '#ffdad4',
+            'outline-variant': '#a5adc6',
+          },
+          fontFamily: {
+            'headline': ['Manrope', 'sans-serif'],
+            'body': ['Inter', 'sans-serif'],
+            'mono': ['JetBrains Mono', 'monospace'],
+          },
+        },
+      },
+    };
+  </script>
+
+  <!-- Styles -->
+  <style>
+    /* ═══ Material Icons Configuration ═══ */
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    }
+
+    /* ═══ Scrollbar Hide ═══ */
+    .scrollbar-hide::-webkit-scrollbar { display: none; }
+    .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+    /* ═══ Animations ═══ */
+    @keyframes msgIn {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .msg-enter { animation: msgIn 0.3s ease both; }
+
+    @keyframes panelIn {
+      from { opacity: 0; transform: translateY(-8px) scale(0.98); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    @keyframes shimmer {
+      from { transform: translateX(-100%); }
+      to { transform: translateX(100%); }
+    }
+
+    @keyframes typingPulse {
+      0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
+      40% { opacity: 1; transform: scale(1); }
+    }
+
+    .typing-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #6332e4;
+      animation: typingPulse 1.4s infinite ease-in-out;
+    }
+    .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+    /* ═══ Button Press ═══ */
+    button:active:not(:disabled) { transform: scale(0.97); }
+
+    /* ═══ Range Slider ═══ */
+    input[type=range] {
+      -webkit-appearance: none;
+      height: 4px;
+      background: #e2e7ff;
+      border-radius: 2px;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #864e00, #d4840a);
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(134,78,0,0.3);
+    }
+    input[type=range]::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #864e00, #d4840a);
+      cursor: pointer;
+      border: none;
+      box-shadow: 0 2px 8px rgba(134,78,0,0.3);
+    }
+
+    /* ═══ Markdown Content ═══ */
+    .ai-content { line-height: 1.7; }
+    .ai-content p { margin: 0.75rem 0; }
+    .ai-content p:first-child { margin-top: 0; }
+    .ai-content p:last-child { margin-bottom: 0; }
+
+    .ai-content pre {
+      background: #0d1117;
+      border-radius: 12px;
+      overflow-x: auto;
+      margin: 1.25rem 0;
+      box-shadow: 0 4px 24px rgba(6,14,32,0.08);
+    }
+    .ai-content pre code {
+      color: #e6edf3;
+      font-size: 0.875rem;
+      line-height: 1.6;
+      font-family: 'JetBrains Mono', monospace;
+      background: none;
+      padding: 0;
+    }
+
+    .ai-content code {
+      background: rgba(99,50,228,0.08);
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: 0.875em;
+      color: #6332e4;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .ai-content strong { font-weight: 600; color: #272e42; }
+    .ai-content em { font-style: italic; }
+    .ai-content ul, .ai-content ol { margin: 0.75rem 0; padding-left: 1.5rem; }
+    .ai-content li { margin: 0.25rem 0; }
+
+    /* ═══ Code Block Header ═══ */
+    .code-header {
+      background: #0d1117;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-radius: 12px 12px 0 0;
+    }
+    .code-header + pre {
+      margin-top: 0;
+      border-radius: 0 0 12px 12px;
+    }
+
+    /* ═══ Toast ═══ */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: #060e20;
+      color: #fff;
+      padding: 12px 24px;
+      border-radius: 9999px;
+      font-size: 14px;
+      font-weight: 500;
+      opacity: 0;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      z-index: 1000;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* ═══ Glass Morphism ═══ */
+    .glass {
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+
+    /* ═══ Ghost Border (inputs only) ═══ */
+    .ghost-border {
+      box-shadow: 0 0 0 1px rgba(165,173,198,0.15);
+    }
+
+    /* ═══ Ambient Shadow ═══ */
+    .ambient-shadow {
+      box-shadow: 0 16px 32px rgba(39,46,66,0.06);
+    }
+
+    /* ═══ Overlay ═══ */
+    .overlay-bg {
+      background: rgba(6, 14, 32, 0.7);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+    }
+  </style>
+</head>
+
+<body class="flex h-screen bg-surface overflow-hidden">
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- ══════════════════════ SIDEBAR (280px) ═══════════════════════════ -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+  <aside id="sidebar" class="w-[280px] h-full bg-inverse-surface flex flex-col p-4 fixed left-0 top-0 z-40 transform transition-transform duration-300 -translate-x-full md:translate-x-0">
+
+    <!-- Brand -->
+    <div class="mb-4 px-2">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-primary to-primary-container flex items-center justify-center shadow-lg">
+          <span class="material-symbols-outlined text-white text-[20px]" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
+        </div>
+        <div class="flex-1">
+          <h1 class="font-headline font-bold text-lg text-white tracking-tight leading-none">CloudChat</h1>
+          <p class="text-[10px] text-inverse-on-surface uppercase tracking-widest font-headline font-semibold opacity-60">AI Conversations</p>
+        </div>
+        <button id="close-sidebar-btn" class="p-1.5 text-inverse-on-surface/50 hover:text-white rounded-lg hover:bg-white/10 transition-colors" title="Close sidebar">
+          <span class="material-symbols-outlined text-[20px]">close</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- New Chat Button -->
+    <button id="new-chat-btn" class="w-full mb-4 py-2 px-3 rounded-xl bg-gradient-to-br from-primary to-primary-container text-white flex items-center justify-center gap-2 hover:opacity-90 transition-all font-headline font-semibold text-sm shadow-md group">
+      <span class="material-symbols-outlined text-[18px] group-hover:rotate-90 transition-transform duration-300">add</span>
+      New Chat
+    </button>
+
+    <!-- Conversation List -->
+    <div class="flex-1 overflow-y-auto scrollbar-hide space-y-1">
+      <div id="conversation-list"></div>
+    </div>
+
+    <!-- Connection Status (Bottom) -->
+    <div class="mt-auto pt-4 border-t border-white/5">
+
+      <!-- Connected State -->
+      <div id="auth-connected" class="hidden">
+        <div class="bg-white/5 rounded-xl p-3 mb-3">
+          <div class="flex items-center gap-2 mb-2">
+            <span id="status-dot" class="w-2 h-2 rounded-full bg-green-400 shadow-[0_0_8px_rgba(74,222,128,0.6)]"></span>
+            <span id="status-provider" class="text-sm text-white font-headline font-semibold">AWS Bedrock</span>
+          </div>
+          <p id="status-detail" class="text-xs text-inverse-on-surface mb-3 font-body opacity-70">via SSO (eeswar)</p>
+          <button id="disconnect-btn" class="w-full py-2 rounded-lg bg-white/10 text-white text-sm font-headline font-semibold hover:bg-white/20 transition-colors">
+            Disconnect
+          </button>
+        </div>
+      </div>
+
+      <!-- Disconnected State -->
+      <div id="auth-disconnected" class="bg-white/5 rounded-xl p-3">
+        <div class="flex items-center gap-2 mb-3">
+          <span class="w-2 h-2 rounded-full bg-error shadow-[0_0_8px_rgba(176,37,0,0.6)]"></span>
+          <span class="text-sm text-white font-headline font-semibold">Not Connected</span>
+        </div>
+        <button id="connect-btn" class="w-full py-2 rounded-lg bg-gradient-to-br from-primary to-primary-container text-white text-sm font-headline font-semibold hover:opacity-90 transition-opacity">
+          Connect Provider
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Sidebar Mobile Overlay -->
+  <div id="sidebar-overlay" class="hidden fixed inset-0 overlay-bg z-30 md:hidden"></div>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- ══════════════════════════ MAIN ══════════════════════════════════ -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+  <main class="flex-1 flex flex-col h-full md:ml-[280px]">
+
+    <!-- Header (Glass Morphism) -->
+    <header class="h-16 glass flex items-center justify-between px-6 border-b border-on-surface/5">
+      <div class="flex items-center gap-3">
+        <button id="hamburger-btn" class="md:hidden p-2 -ml-2 text-on-surface hover:bg-surface-container-low rounded-lg transition-colors">
+          <span class="material-symbols-outlined">menu</span>
+        </button>
+        <h2 id="chat-title" class="font-headline font-bold text-lg text-on-surface tracking-tight">New Chat</h2>
+      </div>
+      <div class="flex items-center gap-2">
+        <button id="settings-btn" class="p-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low rounded-full transition-colors" title="Settings">
+          <span class="material-symbols-outlined">tune</span>
+        </button>
+        <div class="relative">
+          <button id="more-btn" class="p-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low rounded-full transition-colors" title="More">
+            <span class="material-symbols-outlined">more_vert</span>
+          </button>
+          <div id="more-dropdown" class="hidden absolute top-full right-0 mt-1 w-48 bg-surface-container-lowest rounded-xl shadow-[0_8px_32px_rgba(39,46,66,0.12)] overflow-hidden z-50">
+            <button id="export-btn" class="w-full flex items-center gap-3 px-4 py-3 text-sm text-on-surface hover:bg-surface-container-low transition-colors font-body">
+              <span class="material-symbols-outlined text-[18px] text-on-surface-variant">download</span>
+              Export to disk
+            </button>
+            <button id="import-btn" class="w-full flex items-center gap-3 px-4 py-3 text-sm text-on-surface hover:bg-surface-container-low transition-colors font-body">
+              <span class="material-symbols-outlined text-[18px] text-on-surface-variant">upload</span>
+              Import from disk
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Messages Area -->
+    <div id="messages-area" class="flex-1 overflow-y-auto px-4 md:px-8 lg:px-16 xl:px-32 py-8 scrollbar-hide">
+      <!-- Populated by JS -->
+    </div>
+
+    <!-- Input Area (Glass Morphism) -->
+    <div class="px-4 pb-4 pt-2">
+      <div class="max-w-4xl mx-auto relative glass rounded-[0.75rem] ghost-border transition-all focus-within:shadow-[0_0_0_2px_rgba(134,78,0,0.2)]">
+        <div class="flex items-end p-2 gap-2">
+          <textarea
+            id="chat-input"
+            class="flex-1 bg-transparent border-none text-on-surface placeholder-on-surface-variant/50 focus:ring-0 resize-none font-body text-base py-3 px-2 max-h-32 min-h-[44px]"
+            placeholder="Message CloudChat..."
+            rows="1"
+          ></textarea>
+          <button id="send-btn" class="p-3 bg-gradient-to-br from-primary to-primary-container text-white rounded-full hover:opacity-90 transition-all flex-shrink-0 shadow-md disabled:opacity-40 disabled:cursor-not-allowed" disabled>
+            <span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">send</span>
+          </button>
+        </div>
+        <div class="px-4 pb-2">
+          <p class="text-[11px] text-on-surface-variant font-body text-center">AI may produce inaccurate information.</p>
+        </div>
+      </div>
+    </div>
+  </main>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- ════════════════════ AUTH OVERLAY ════════════════════════════════ -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+  <div id="auth-overlay" class="hidden fixed inset-0 overlay-bg z-50 flex items-center justify-center p-4">
+    <div class="max-w-4xl w-full glass rounded-[0.75rem] p-8 ambient-shadow">
+      <div class="text-center mb-8">
+        <div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-primary to-primary-container flex items-center justify-center shadow-xl">
+          <span class="material-symbols-outlined text-white text-[32px]" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
+        </div>
+        <h1 class="font-headline font-bold text-2xl text-on-surface mb-2">Connect to AI Provider</h1>
+        <p class="text-on-surface-variant font-body text-sm">Choose your preferred AI provider to get started</p>
+      </div>
+
+      <!-- Provider Cards -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+
+        <!-- AWS Bedrock Card -->
+        <div id="provider-bedrock" class="provider-card bg-surface-container-lowest rounded-[0.75rem] p-5 cursor-pointer border-2 border-transparent hover:border-primary-container/30 transition-all">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+              <span class="material-symbols-outlined text-primary text-[20px]">cloud</span>
+            </div>
+            <div>
+              <h3 class="font-headline font-bold text-base text-on-surface">AWS Bedrock</h3>
+              <p class="text-xs text-on-surface-variant font-body">Claude, Titan, more</p>
+            </div>
+          </div>
+          <div class="space-y-3 hidden" id="bedrock-form">
+            <div id="bedrock-tabs" class="flex gap-1 mb-3">
+              <button class="bedrock-tab-btn flex-1 py-1.5 px-2 rounded-lg text-xs font-headline font-semibold transition-colors bg-surface-container text-on-surface" data-tab="api">Access Keys</button>
+              <button class="bedrock-tab-btn flex-1 py-1.5 px-2 rounded-lg text-xs font-headline font-semibold transition-colors text-on-surface-variant hover:bg-surface-container-low" data-tab="quick">API Key</button>
+              <button class="bedrock-tab-btn flex-1 py-1.5 px-2 rounded-lg text-xs font-headline font-semibold transition-colors text-on-surface-variant hover:bg-surface-container-low" data-tab="sso" id="sso-tab-btn">SSO Profile</button>
+            </div>
+
+            <!-- API Keys Tab -->
+            <div id="bedrock-api-tab" class="space-y-3">
+              <input type="text" id="bedrock-access-key" placeholder="Access Key" class="w-full bg-surface-container ghost-border rounded-lg py-2 px-3 text-sm text-on-surface placeholder-on-surface-variant/50 focus:outline-none focus:shadow-[0_0_0_2px_rgba(134,78,0,0.2)] transition-all font-body"/>
+              <input type="password" id="bedrock-secret-key" placeholder="Secret Key" class="w-full bg-surface-container ghost-border rounded-lg py-2 px-3 text-sm text-on-surface placeholder-on-surface-variant/50 focus:outline-none focus:shadow-[0_0_0_2px_rgba(134,78,0,0.2)] transition-all font-body"/>
+              <input type="password" id="bedrock-session-token" placeholder="Session Token (optional)" class="w-full bg-surface-container ghost-border rounded-lg py-2 px-3 text-sm text-on-surface placeholder-on-surface-variant/50 focus:outline-none focus:shadow-[0_0_0_2px_rgba(134,78,0,0.2)] transition-all font-body"/>
+              <input type="text" id="bedrock-region" placeholder="Region (us-east-1)" class="w-full bg-surface-container ghost-border rounded-lg py-2 px-3 text-sm text-on-surface placeholder-on-surface-variant/50 focus:outline-none focus:shadow-[0_0_0_2px_rgba(134,78,0,0.2)] transition-all font-body"/>
+            </div>
+
+            <!-- SSO Tab -->
+            <div id="bedrock-sso-tab" class="hidden space-y-3">
+              <select id="bedrock-sso-profile" class="w-full bg-surface-container ghost-border rounded-lg py-2 px-3 text-sm text-on-surface focus:outline-none focus:shadow-[0_0_0_2px_rgba(134,78,0,0.2)] transition-all font-body">
+                <option value="">Loading profiles...</option>
+              </select>
+              <input type="text" id="bedrock-sso-region" placeholder="Region (us-east-1)" value="us-east-1" class="w-full bg-surface-container ghost-border rounded-lg py-2 px-3 text-sm text-on-surface placeholder-on-surface-variant/50 focus:outline-none focus:shadow-[0_0_0_2px_rgba(134,78,0,0.2)] transition-all font-body"/>
+            </div>
+
+            <!-- Quick API Key Tab -->
+            <div id="bedrock-quick-tab" class="hidden space-y-3">
+              <input type="text" id="bedrock-quick-access" placeholder="Access Key ID" class="w-full bg-surface-container ghost-border rounded-lg py-2 px-3 text-sm text-on-surface placeholder-on-surface-variant/50 focus:outline-none focus:shadow-[0_0_0_2px_rgba(134,78,0,0.2)] transition-all font-body"/>
+              <input type="password" id="bedrock-quick-secret" placeholder="Secret Access Key" class="w-full bg-surface-container ghost-border rounded-lg py-2 px-3 text-sm text-on-surface placeholder-on-surface-variant/50 focus:outline-none focus:shadow-[0_0_0_2px_rgba(134,78,0,0.2)] transition-all font-body"/>
+              <p class="text-[10px] text-on-surface-variant">Region defaults to us-east-1</p>
+            </div>
+
+            <button id="bedrock-connect-btn" class="w-full py-2.5 rounded-lg bg-gradient-to-br from-primary to-primary-container text-white font-headline font-bold hover:opacity-90 transition-opacity">
+              Connect
+            </button>
+          </div>
+        </div>
+
+        <!-- Anthropic Card -->
+        <div id="provider-anthropic" class="provider-card bg-surface-container-lowest rounded-[0.75rem] p-5 cursor-pointer border-2 border-transparent hover:border-primary-container/30 transition-all">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-10 h-10 rounded-lg bg-tertiary/10 flex items-center justify-center">
+              <span class="material-symbols-outlined text-tertiary text-[20px]">psychology</span>
+            </div>
+            <div>
+              <h3 class="font-headline font-bold text-base text-on-surface">Anthropic Claude</h3>
+              <p class="text-xs text-on-surface-variant font-body">Direct API access</p>
+            </div>
+          </div>
+          <div class="space-y-3 hidden" id="anthropic-form">
+            <input type="password" id="anthropic-api-key" placeholder="API Key (sk-ant-...)" class="w-full bg-surface-container ghost-border rounded-lg py-2 px-3 text-sm text-on-surface placeholder-on-surface-variant/50 focus:outline-none focus:shadow-[0_0_0_2px_rgba(134,78,0,0.2)] transition-all font-body"/>
+            <button id="anthropic-connect-btn" class="w-full py-2.5 rounded-lg bg-gradient-to-br from-primary to-primary-container text-white font-headline font-bold hover:opacity-90 transition-opacity">
+              Connect
+            </button>
+          </div>
+        </div>
+
+        <!-- Gemini Card -->
+        <div id="provider-gemini" class="provider-card bg-surface-container-lowest rounded-[0.75rem] p-5 cursor-pointer border-2 border-transparent hover:border-primary-container/30 transition-all">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-10 h-10 rounded-lg bg-primary-container/20 flex items-center justify-center">
+              <span class="material-symbols-outlined text-primary-container text-[20px]">auto_awesome</span>
+            </div>
+            <div>
+              <h3 class="font-headline font-bold text-base text-on-surface">Google Gemini</h3>
+              <p class="text-xs text-on-surface-variant font-body">Gemini Pro & Ultra</p>
+            </div>
+          </div>
+          <div class="space-y-3 hidden" id="gemini-form">
+            <input type="password" id="gemini-api-key" placeholder="API Key" class="w-full bg-surface-container ghost-border rounded-lg py-2 px-3 text-sm text-on-surface placeholder-on-surface-variant/50 focus:outline-none focus:shadow-[0_0_0_2px_rgba(134,78,0,0.2)] transition-all font-body"/>
+            <button id="gemini-connect-btn" class="w-full py-2.5 rounded-lg bg-gradient-to-br from-primary to-primary-container text-white font-headline font-bold hover:opacity-90 transition-opacity">
+              Connect
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div id="auth-error" class="hidden mt-4 p-3 bg-error-container rounded-lg flex items-center gap-3">
+        <span class="material-symbols-outlined text-error">error</span>
+        <span class="text-sm text-error font-body"></span>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- ══════════════════ SETTINGS DRAWER ═══════════════════════════════ -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+  <div id="settings-drawer" class="fixed top-0 right-0 h-full w-[320px] glass border-l border-on-surface/10 transform translate-x-full transition-transform duration-300 z-50 overflow-y-auto">
+    <div class="p-6">
+      <div class="flex items-center justify-between mb-6">
+        <h3 class="font-headline font-bold text-lg text-on-surface">Settings</h3>
+        <button id="settings-close-btn" class="p-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low rounded-full transition-colors">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+
+      <div class="space-y-6">
+        <!-- Model -->
+        <div>
+          <label class="block text-xs font-headline font-semibold text-on-surface-variant mb-2">Model</label>
+          <select id="model-select" class="w-full bg-surface-container ghost-border rounded-lg py-2 px-3 text-sm text-on-surface focus:outline-none focus:shadow-[0_0_0_2px_rgba(134,78,0,0.2)] transition-all font-body">
+            <option>Loading models...</option>
+          </select>
+        </div>
+
+        <!-- Temperature -->
+        <div>
+          <div class="flex justify-between items-center mb-2">
+            <label class="text-xs font-headline font-semibold text-on-surface-variant">Temperature</label>
+            <span id="temp-value" class="text-xs font-headline font-bold text-primary">1.00</span>
+          </div>
+          <input type="range" id="temperature-slider" min="0" max="1" step="0.05" value="1.0" class="w-full"/>
+        </div>
+
+        <!-- Max Tokens -->
+        <div>
+          <div class="flex justify-between items-center mb-2">
+            <label class="text-xs font-headline font-semibold text-on-surface-variant">Max Tokens</label>
+            <span id="max-tokens-value" class="text-xs font-headline font-bold text-primary">1024</span>
+          </div>
+          <input type="range" id="max-tokens-slider" min="256" max="4096" step="128" value="1024" class="w-full"/>
+        </div>
+
+        <!-- Guardrail (Bedrock only) -->
+        <div id="guardrail-section" class="hidden">
+          <label class="block text-xs font-headline font-semibold text-on-surface-variant mb-2">Guardrail ID</label>
+          <input type="text" id="guardrail-id" placeholder="e.g. abc123def456" class="w-full bg-surface-container ghost-border rounded-lg py-2 px-3 text-sm text-on-surface placeholder-on-surface-variant/50 focus:outline-none focus:shadow-[0_0_0_2px_rgba(134,78,0,0.2)] transition-all font-body mb-3"/>
+          <label class="block text-xs font-headline font-semibold text-on-surface-variant mb-2">Guardrail Version</label>
+          <input type="text" id="guardrail-version" placeholder="DRAFT" value="DRAFT" class="w-full bg-surface-container ghost-border rounded-lg py-2 px-3 text-sm text-on-surface placeholder-on-surface-variant/50 focus:outline-none focus:shadow-[0_0_0_2px_rgba(134,78,0,0.2)] transition-all font-body"/>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- ══════════════════════ JAVASCRIPT ════════════════════════════════ -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+  <script>
+    // ═══════════════════════════════════════════════════════════════════
+    // ══════════════════ CONSTANTS & CONFIGURATION ═════════════════════
+    // ═══════════════════════════════════════════════════════════════════
+
+    const API_BASE_URL = (() => {
+      const h = window.location.hostname;
+      if (h === 'localhost' || h === '127.0.0.1') return '';
+      return 'https://cloudchat-api.onrender.com'; // TODO: update after deploy
+    })();
+
+    const IS_LOCAL = API_BASE_URL === '';
+
+    const STORAGE_KEY = 'cloudchat_conversations';
+    const ACTIVE_KEY = 'cloudchat_active';
+    const SETTINGS_KEY = 'cloudchat_settings';
+
+    const SUGGESTED_PROMPTS = [
+      {
+        title: "Write a Python function",
+        subtitle: "to parse CloudWatch logs and extract error patterns"
+      },
+      {
+        title: "Explain the architecture",
+        subtitle: "of a serverless REST API on AWS Lambda"
+      },
+      {
+        title: "Review this code",
+        subtitle: "for security vulnerabilities and suggest fixes"
+      },
+      {
+        title: "Design a database schema",
+        subtitle: "for a multi-tenant SaaS application"
+      }
+    ];
+
+
+    // ═══════════════════════════════════════════════════════════════════
+    // ══════════════════════════ STATE ═════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════════
+
+    const state = {
+      isStreaming: false,
+      isAuthenticated: false,
+      provider: null,           // "bedrock" | "anthropic" | "gemini"
+      authMethod: null,         // "sso" | "api_key" | "env"
+      authProfile: null,
+      authRegion: 'us-east-1',
+      currentChatId: null,
+      chatHistory: [],
+      settings: {
+        model: '',
+        temperature: 1.0,
+        maxTokens: 1024,
+        guardrailId: '',
+        guardrailVersion: 'DRAFT',
+      },
+      availableModels: [],
+      providers: {},
+    };
+
+
+    // ═══════════════════════════════════════════════════════════════════
+    // ══════════════════════ DOM REFERENCES ════════════════════════════
+    // ═══════════════════════════════════════════════════════════════════
+
+    const $ = id => document.getElementById(id);
+    const $$ = sel => document.querySelectorAll(sel);
+
+    const sidebar = $('sidebar');
+    const sidebarOverlay = $('sidebar-overlay');
+    const hamburgerBtn = $('hamburger-btn');
+    const newChatBtn = $('new-chat-btn');
+    const conversationList = $('conversation-list');
+    const messagesArea = $('messages-area');
+    const chatInput = $('chat-input');
+    const sendBtn = $('send-btn');
+    const chatTitle = $('chat-title');
+    const settingsBtn = $('settings-btn');
+    const settingsDrawer = $('settings-drawer');
+    const settingsCloseBtn = $('settings-close-btn');
+    const authOverlay = $('auth-overlay');
+    const authConnected = $('auth-connected');
+    const authDisconnected = $('auth-disconnected');
+    const connectBtn = $('connect-btn');
+    const disconnectBtn = $('disconnect-btn');
+
+
+    // ═══════════════════════════════════════════════════════════════════
+    // ═══════════════════════ UTILITY FUNCTIONS ════════════════════════
+    // ═══════════════════════════════════════════════════════════════════
+
+    function escHtml(s) {
+      return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function showToast(msg) {
+      let toast = $('toast');
+      if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'toast';
+        toast.className = 'toast';
+        document.body.appendChild(toast);
+      }
+      toast.textContent = msg;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 2500);
+    }
+
+    function scrollToBottom() {
+      messagesArea.scrollTo({ top: messagesArea.scrollHeight, behavior: 'smooth' });
+    }
+
+    function getGreeting() {
+      const hour = new Date().getHours();
+      if (hour < 12) return 'Good morning';
+      if (hour < 18) return 'Good afternoon';
+      return 'Good evening';
+    }
+
+
+    // ═══════════════════════════════════════════════════════════════════
+    // ═══════════════════ LOCALSTORAGE MANAGEMENT ══════════════════════
+    // ═══════════════════════════════════════════════════════════════════
+
+    function loadChats() {
+      try {
+        return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+      } catch {
+        return [];
+      }
+    }
+
+    function saveChats(chats) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(chats));
+      } catch (e) {
+        console.warn('localStorage full:', e);
+      }
+    }
+
+    function getActiveChatId() {
+      return localStorage.getItem(ACTIVE_KEY);
+    }
+
+    function setActiveChatId(id) {
+      localStorage.setItem(ACTIVE_KEY, id);
+    }
+
+    function loadSettings() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY));
+        if (saved) Object.assign(state.settings, saved);
+      } catch {}
+      $('temperature-slider').value = state.settings.temperature;
+      $('temp-value').textContent = state.settings.temperature.toFixed(2);
+      $('max-tokens-slider').value = state.settings.maxTokens;
+      $('max-tokens-value').textContent = state.settings.maxTokens;
+      $('guardrail-id').value = state.settings.guardrailId;
+      $('guardrail-version').value = state.settings.guardrailVersion;
+    }
+
+    function saveSettings() {
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
+    }
+
+
+    // ═══════════════════════════════════════════════════════════════════
+    // ═══════════════════════ CHAT MANAGEMENT ══════════════════════════
+    // ═══════════════════════════════════════════════════════════════════
+
+    function createNewChat() {
+      const chat = {
+        id: 'chat_' + Date.now(),
+        title: 'New Chat',
+        messages: [],
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      };
+      const chats = loadChats();
+      chats.unshift(chat);
+      saveChats(chats);
+      setActiveChatId(chat.id);
+      state.chatHistory = [];
+      state.currentChatId = chat.id;
+      showWelcomeState();
+      renderSidebar();
+      updateHeader();
+      chatInput.focus();
+      return chat;
+    }
+
+    function switchChat(chatId) {
+      const chats = loadChats();
+      const chat = chats.find(c => c.id === chatId);
+      if (!chat) return;
+      setActiveChatId(chatId);
+      state.chatHistory = [...chat.messages];
+      state.currentChatId = chatId;
+      messagesArea.innerHTML = '';
+      if (state.chatHistory.length === 0) {
+        showWelcomeState();
+      } else {
+        for (const msg of state.chatHistory) {
+          if (msg.role === 'user') {
+            messagesArea.insertAdjacentHTML('beforeend', createUserMessageHTML(msg.content));
+          } else {
+            messagesArea.insertAdjacentHTML('beforeend', createAIMessageHTML(renderMarkdown(msg.content)));
+          }
+        }
+        scrollToBottom();
+      }
+      renderSidebar();
+      updateHeader();
+    }
+
+    function deleteChat(chatId) {
+      let chats = loadChats();
+      chats = chats.filter(c => c.id !== chatId);
+      saveChats(chats);
+      if (getActiveChatId() === chatId) {
+        if (chats.length > 0) switchChat(chats[0].id);
+        else createNewChat();
+      } else {
+        renderSidebar();
+      }
+    }
+
+    function saveCurrentChat() {
+      const activeId = getActiveChatId();
+      if (!activeId) return;
+      const chats = loadChats();
+      const chat = chats.find(c => c.id === activeId);
+      if (!chat) return;
+      chat.messages = [...state.chatHistory];
+      chat.updatedAt = Date.now();
+      if (chat.title === 'New Chat' && state.chatHistory.length > 0) {
+        const firstUser = state.chatHistory.find(m => m.role === 'user');
+        if (firstUser) {
+          const t = firstUser.content.trim();
+          chat.title = t.length > 40 ? t.substring(0, 40) + '...' : t;
+        }
+      }
+      saveChats(chats);
+      syncToDisk(chat);
+      renderSidebar();
+      updateHeader();
+    }
+
+    function syncToDisk(chat) {
+      if (!IS_LOCAL) return; // Skip on deployed version
+      fetch(API_BASE_URL + '/api/conversations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(chat),
+      }).catch(() => {});
+    }
+
+
+    // ═══════════════════════════════════════════════════════════════════
+    // ═══════════════════════ AUTH MODULE ══════════════════════════════
+    // ═══════════════════════════════════════════════════════════════════
+
+    async function checkAuth() {
+      try {
+        const res = await fetch(API_BASE_URL + '/api/auth-status');
+        const data = await res.json();
+        state.provider = data.provider;
+        state.authMethod = data.method;
+        state.authProfile = data.profile;
+        state.authRegion = data.region || 'us-east-1';
+        state.isAuthenticated = !!data.provider;
+
+        if (state.isAuthenticated) {
+          renderAuthConnected();
+          authOverlay.classList.add('hidden');
+          await fetchModels();
+        } else {
+          renderAuthDisconnected();
+          authOverlay.classList.remove('hidden');
+          await fetchProviders();
+        }
+      } catch (err) {
+        console.error('Auth check failed:', err);
+        renderAuthDisconnected();
+        authOverlay.classList.remove('hidden');
+      }
+    }
+
+    async function fetchProviders() {
+      try {
+        const res = await fetch(API_BASE_URL + '/api/providers');
+        state.providers = await res.json();
+      } catch {}
+    }
+
+    async function fetchProfiles() {
+      if (!IS_LOCAL) return;
+      try {
+        const res = await fetch(API_BASE_URL + '/api/profiles');
+        const data = await res.json();
+        const select = $('bedrock-sso-profile');
+        select.innerHTML = '<option value="">Select profile...</option>';
+        for (const profile of data.profiles) {
+          const opt = document.createElement('option');
+          opt.value = profile;
+          opt.textContent = profile;
+          select.appendChild(opt);
+        }
+      } catch {}
+    }
+
+    async function fetchModels() {
+      try {
+        const res = await fetch(API_BASE_URL + '/api/models');
+        const data = await res.json();
+        state.availableModels = data.models;
+        const select = $('model-select');
+        select.innerHTML = '';
+        let hasDefault = false;
+        for (const m of data.models) {
+          const opt = document.createElement('option');
+          opt.value = m.id;
+          opt.textContent = m.name;
+          if (m.default) {
+            opt.selected = true;
+            state.settings.model = m.id;
+            hasDefault = true;
+          } else if (!hasDefault && m.id === state.settings.model) {
+            opt.selected = true;
+          }
+          select.appendChild(opt);
+        }
+        if (!hasDefault && state.availableModels.length > 0) {
+          state.settings.model = state.availableModels[0].id;
+        }
+
+        // Show guardrail section only for Bedrock
+        if (state.provider === 'bedrock') {
+          $('guardrail-section').classList.remove('hidden');
+        } else {
+          $('guardrail-section').classList.add('hidden');
+        }
+
+        updateHeader();
+        saveSettings();
+      } catch {}
+    }
+
+    async function connectProvider(provider, credentials) {
+      const btn = $(`${provider}-connect-btn`);
+      const originalText = btn.textContent;
+      btn.textContent = 'Connecting...';
+      btn.disabled = true;
+      hideAuthError();
+
+      try {
+        const res = await fetch(API_BASE_URL + '/api/auth-provider', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ provider, ...credentials })
+        });
+        const data = await res.json();
+
+        if (data.success || res.ok) {
+          state.isAuthenticated = true;
+          state.provider = provider;
+          state.authMethod = credentials.profile ? 'sso' : 'api_key';
+          state.authProfile = credentials.profile;
+          state.authRegion = credentials.region || 'us-east-1';
+          renderAuthConnected();
+          authOverlay.classList.add('hidden');
+          await fetchModels();
+          showToast('Connected successfully');
+        } else {
+          showAuthError(data.error || 'Connection failed');
+        }
+      } catch (err) {
+        showAuthError('Connection error: ' + err.message);
+      }
+
+      btn.textContent = originalText;
+      btn.disabled = false;
+    }
+
+    async function connectSSO(profile, region) {
+      const btn = $('bedrock-connect-btn');
+      const originalText = btn.textContent;
+      btn.textContent = 'Connecting...';
+      btn.disabled = true;
+      hideAuthError();
+
+      try {
+        const res = await fetch(API_BASE_URL + '/api/auth-sso', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ profile, region })
+        });
+        const data = await res.json();
+
+        if (data.success || res.ok) {
+          state.isAuthenticated = true;
+          state.provider = 'bedrock';
+          state.authMethod = 'sso';
+          state.authProfile = profile;
+          state.authRegion = region;
+          renderAuthConnected();
+          authOverlay.classList.add('hidden');
+          await fetchModels();
+          showToast('Connected via SSO');
+        } else {
+          showAuthError(data.error || 'SSO connection failed');
+        }
+      } catch (err) {
+        showAuthError('Connection error: ' + err.message);
+      }
+
+      btn.textContent = originalText;
+      btn.disabled = false;
+    }
+
+    async function disconnect() {
+      try {
+        await fetch(API_BASE_URL + '/api/auth-disconnect', { method: 'POST' });
+      } catch {}
+
+      state.isAuthenticated = false;
+      state.provider = null;
+      state.authMethod = null;
+      state.authProfile = null;
+      renderAuthDisconnected();
+      authOverlay.classList.remove('hidden');
+      showToast('Disconnected');
+    }
+
+    function renderAuthConnected() {
+      authConnected.classList.remove('hidden');
+      authDisconnected.classList.add('hidden');
+
+      const providerNames = {
+        bedrock: 'AWS Bedrock',
+        anthropic: 'Anthropic Claude',
+        gemini: 'Google Gemini'
+      };
+
+      $('status-provider').textContent = providerNames[state.provider] || 'Connected';
+
+      if (state.authMethod === 'sso') {
+        $('status-detail').textContent = `via SSO (${state.authProfile})`;
+      } else if (state.authMethod === 'api_key') {
+        $('status-detail').textContent = `via API Key`;
+      } else {
+        $('status-detail').textContent = `Environment credentials`;
+      }
+    }
+
+    function renderAuthDisconnected() {
+      authConnected.classList.add('hidden');
+      authDisconnected.classList.remove('hidden');
+    }
+
+    function showAuthError(msg) {
+      const el = $('auth-error');
+      el.querySelector('span.text-sm').textContent = msg;
+      el.classList.remove('hidden');
+    }
+
+    function hideAuthError() {
+      $('auth-error').classList.add('hidden');
+    }
+
+
+    // ═══════════════════════════════════════════════════════════════════
+    // ═══════════════════ MARKDOWN RENDERER ════════════════════════════
+    // ═══════════════════════════════════════════════════════════════════
+
+    function renderMarkdown(text) {
+      // Code blocks with language
+      let html = text.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
+        const langLabel = lang || 'code';
+        return `<div class="code-block my-4">
+          <div class="code-header">
+            <span class="text-xs text-white/60 font-mono">${escHtml(langLabel)}</span>
+            <button class="copy-code-btn text-xs text-white/60 hover:text-white transition-colors font-body font-medium">Copy</button>
+          </div>
+          <pre><code>${escHtml(code.trim())}</code></pre>
+        </div>`;
+      });
+
+      // Inline code
+      html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+      // Bold
+      html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+
+      // Italic
+      html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+
+      // Lists
+      html = html.replace(/^[-*] (.+)$/gm, '<li>$1</li>');
+      html = html.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
+      html = html.replace(/((?:<li>.*<\/li>\n?)+)/g, '<ul>$1</ul>');
+
+      // Paragraphs
+      html = html.split(/\n{2,}/).map(p => {
+        p = p.trim();
+        if (!p) return '';
+        if (p.startsWith('<pre>') || p.startsWith('<ul>') || p.startsWith('<ol>') || p.startsWith('<div')) return p;
+        return `<p>${p.replace(/\n/g, '<br>')}</p>`;
+      }).join('');
+
+      return html;
+    }
+
+
+    // ═══════════════════════════════════════════════════════════════════
+    // ═══════════════════ MESSAGE TEMPLATES ════════════════════════════
+    // ═══════════════════════════════════════════════════════════════════
+
+    function createUserMessageHTML(text) {
+      return `<div class="flex flex-col items-end w-full msg-enter mb-8">
+        <div class="max-w-[80%] md:max-w-[70%]">
+          <p class="font-body text-base text-on-surface leading-[1.7] text-right">${escHtml(text).replace(/\n/g, '<br>')}</p>
+          <p class="text-xs text-on-surface-variant font-headline font-semibold mt-2 text-right tracking-wide uppercase" style="font-size: 10px;">You</p>
+        </div>
+      </div>`;
+    }
+
+    function createAIMessageHTML(content, id = '') {
+      return `<div ${id ? `id="${id}"` : ''} class="flex flex-col items-start w-full msg-enter mb-8" data-role="assistant">
+        <div class="flex items-center gap-3 mb-3">
+          <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-primary-container flex items-center justify-center shadow-md">
+            <span class="material-symbols-outlined text-white text-[16px]" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
+          </div>
+          <span class="font-headline font-bold text-sm text-on-surface-variant tracking-wide uppercase" style="font-size: 10px;">CloudChat</span>
+        </div>
+        <div class="ml-11 max-w-[85%] md:max-w-[80%]">
+          <div class="ai-content font-body text-base text-on-surface">${content}</div>
+          <div class="ai-toolbar mt-4 bg-surface-container-low/50 rounded-[0.75rem] px-3 py-2 flex items-center gap-2">
+            <button class="copy-btn p-1.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-lg transition-colors" title="Copy">
+              <span class="material-symbols-outlined text-[18px]">content_copy</span>
+            </button>
+            <button class="regenerate-btn p-1.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-lg transition-colors" title="Regenerate">
+              <span class="material-symbols-outlined text-[18px]">refresh</span>
+            </button>
+            <button class="thumb-up-btn p-1.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-lg transition-colors" title="Good">
+              <span class="material-symbols-outlined text-[18px]">thumb_up</span>
+            </button>
+            <button class="thumb-down-btn p-1.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-lg transition-colors" title="Bad">
+              <span class="material-symbols-outlined text-[18px]">thumb_down</span>
+            </button>
+          </div>
+        </div>
+      </div>`;
+    }
+
+    function createTypingIndicatorHTML(id) {
+      return `<div id="${id}" class="flex items-center gap-3 mb-8 msg-enter">
+        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-primary-container flex items-center justify-center shadow-md">
+          <span class="material-symbols-outlined text-white text-[16px]" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
+        </div>
+        <div class="flex gap-1.5">
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+        </div>
+      </div>`;
+    }
+
+    function showWelcomeState() {
+      const greeting = getGreeting();
+      messagesArea.innerHTML = `
+        <div id="welcome-state" class="flex flex-col items-center justify-center min-h-full py-16">
+          <div class="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary to-primary-container flex items-center justify-center shadow-xl mb-6 relative">
+            <span class="material-symbols-outlined text-white text-[40px]" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
+            <div class="absolute inset-0 rounded-2xl bg-gradient-to-br from-primary to-primary-container opacity-30 blur-2xl -z-10"></div>
+          </div>
+          <h2 class="font-headline font-bold text-3xl text-on-surface mb-2">${greeting}</h2>
+          <p class="text-on-surface-variant font-body text-sm mb-12">Powered by AWS Bedrock, Claude & Gemini</p>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-2xl w-full px-4">
+            ${SUGGESTED_PROMPTS.map(p => `
+              <button class="suggested-prompt bg-surface-container-lowest rounded-[0.75rem] p-4 text-left hover:bg-surface-container transition-all border border-outline-variant/10 hover:border-primary-container/30 ambient-shadow" data-prompt="${escHtml(p.title + ' ' + p.subtitle)}">
+                <h3 class="font-headline font-bold text-sm text-on-surface mb-1">${escHtml(p.title)}</h3>
+                <p class="text-xs text-on-surface-variant font-body">${escHtml(p.subtitle)}</p>
+              </button>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    function removeWelcomeState() {
+      const ws = $('welcome-state');
+      if (ws) ws.remove();
+    }
+
+
+    // ═══════════════════════════════════════════════════════════════════
+    // ═══════════════════ SIDEBAR RENDERING ════════════════════════════
+    // ═══════════════════════════════════════════════════════════════════
+
+    function renderSidebar() {
+      const chats = loadChats();
+      const activeId = getActiveChatId();
+      conversationList.innerHTML = '';
+
+      if (chats.length > 0) {
+        conversationList.innerHTML = '<p class="text-xs text-inverse-on-surface uppercase tracking-widest font-headline font-semibold mb-3 px-2 opacity-60">Recent</p>';
+      }
+
+      for (const chat of chats) {
+        const isActive = chat.id === activeId;
+        const item = document.createElement('div');
+        item.className = isActive
+          ? 'relative flex items-center gap-3 px-3 py-1.5 rounded-lg bg-white/10 text-white transition-all group cursor-pointer'
+          : 'relative flex items-center gap-3 px-3 py-1.5 rounded-lg text-inverse-on-surface hover:bg-white/5 hover:text-white transition-all group cursor-pointer';
+
+        if (isActive) {
+          item.innerHTML = `
+            <div class="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-gradient-to-b from-primary to-primary-container rounded-r-full"></div>
+            <span class="material-symbols-outlined text-[18px] opacity-70">chat_bubble</span>
+            <span class="text-sm truncate flex-1 font-body">${escHtml(chat.title)}</span>
+            <button class="delete-chat-btn opacity-0 group-hover:opacity-100 p-1 hover:text-error transition-all" data-id="${chat.id}" title="Delete">
+              <span class="material-symbols-outlined text-[16px]">close</span>
+            </button>
+          `;
+        } else {
+          item.innerHTML = `
+            <span class="material-symbols-outlined text-[18px] opacity-50">chat_bubble</span>
+            <span class="text-sm truncate flex-1 font-body">${escHtml(chat.title)}</span>
+            <button class="delete-chat-btn opacity-0 group-hover:opacity-100 p-1 hover:text-error transition-all" data-id="${chat.id}" title="Delete">
+              <span class="material-symbols-outlined text-[16px]">close</span>
+            </button>
+          `;
+        }
+
+        item.addEventListener('click', (e) => {
+          if (!e.target.closest('.delete-chat-btn')) {
+            switchChat(chat.id);
+            if (window.innerWidth < 768) closeSidebar();
+          }
+        });
+
+        item.querySelector('.delete-chat-btn').addEventListener('click', (e) => {
+          e.stopPropagation();
+          deleteChat(chat.id);
+        });
+
+        conversationList.appendChild(item);
+      }
+    }
+
+    function updateHeader() {
+      const chats = loadChats();
+      const active = chats.find(c => c.id === getActiveChatId());
+      chatTitle.textContent = active ? active.title : 'New Chat';
+    }
+
+
+    // ═══════════════════════════════════════════════════════════════════
+    // ═══════════════════ CHAT STREAMING ═══════════════════════════════
+    // ═══════════════════════════════════════════════════════════════════
+
+    async function sendMessage() {
+      const text = chatInput.value.trim();
+      if (!text || state.isStreaming) return;
+
+      if (!state.isAuthenticated) {
+        showToast('Please connect a provider first');
+        authOverlay.classList.remove('hidden');
+        return;
+      }
+
+      removeWelcomeState();
+      messagesArea.insertAdjacentHTML('beforeend', createUserMessageHTML(text));
+      state.chatHistory.push({ role: 'user', content: text });
+      saveCurrentChat();
+
+      chatInput.value = '';
+      chatInput.style.height = '44px';
+      sendBtn.disabled = true;
+      state.isStreaming = true;
+
+      const typingId = 'typing-' + Date.now();
+      messagesArea.insertAdjacentHTML('beforeend', createTypingIndicatorHTML(typingId));
+      scrollToBottom();
+
+      let fullText = '';
+      try {
+        const payload = {
+          messages: state.chatHistory,
+          model: state.settings.model,
+          temperature: state.settings.temperature,
+          max_tokens: state.settings.maxTokens,
+        };
+
+        if (state.provider === 'bedrock' && state.settings.guardrailId) {
+          payload.guardrail_id = state.settings.guardrailId;
+          payload.guardrail_version = state.settings.guardrailVersion;
+        }
+
+        const res = await fetch(API_BASE_URL + '/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        // Remove typing indicator
+        $(typingId).remove();
+
+        // Create AI message container
+        const aiMsgId = 'ai-msg-' + Date.now();
+        messagesArea.insertAdjacentHTML('beforeend', createAIMessageHTML('', aiMsgId));
+        const contentEl = $(aiMsgId).querySelector('.ai-content');
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop();
+
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            const payload = line.slice(6);
+            if (payload === '[DONE]') break;
+
+            try {
+              const data = JSON.parse(payload);
+
+              if (data.error) {
+                contentEl.innerHTML = `<div class="p-4 bg-error-container rounded-xl flex items-center gap-3">
+                  <span class="material-symbols-outlined text-error">error</span>
+                  <span class="text-sm text-on-surface">${escHtml(data.error)}</span>
+                </div>`;
+                await checkAuth(); // Re-check auth on error
+                state.isStreaming = false;
+                return;
+              }
+
+              if (data.guardrail) {
+                contentEl.innerHTML += `<div class="mt-4 p-4 bg-error-container rounded-xl flex items-center gap-3">
+                  <span class="material-symbols-outlined text-error">shield</span>
+                  <span class="text-sm text-on-surface">Response filtered by guardrails.</span>
+                </div>`;
+              }
+
+              if (data.text) {
+                fullText += data.text;
+                contentEl.innerHTML = renderMarkdown(fullText);
+                scrollToBottom();
+              }
+            } catch (e) {
+              console.warn('Parse error:', e);
+            }
+          }
+        }
+
+        if (fullText) {
+          state.chatHistory.push({ role: 'assistant', content: fullText });
+          saveCurrentChat();
+        }
+
+      } catch (err) {
+        const typingEl = $(typingId);
+        if (typingEl) typingEl.remove();
+        messagesArea.insertAdjacentHTML('beforeend', createAIMessageHTML(`<div class="p-4 bg-error-container rounded-xl flex items-center gap-3">
+          <span class="material-symbols-outlined text-error">error</span>
+          <span class="text-sm text-on-surface">Connection error: ${escHtml(err.message)}</span>
+        </div>`));
+        await checkAuth();
+      }
+
+      state.isStreaming = false;
+      chatInput.focus();
+    }
+
+    async function regenerateResponse() {
+      if (!state.isAuthenticated || state.isStreaming || state.chatHistory.length === 0) return;
+
+      // Remove last assistant message
+      if (state.chatHistory[state.chatHistory.length - 1].role === 'assistant') {
+        state.chatHistory.pop();
+        const lastAI = messagesArea.querySelector('[data-role="assistant"]:last-child');
+        if (lastAI) lastAI.remove();
+      }
+
+      state.isStreaming = true;
+      const typingId = 'typing-' + Date.now();
+      messagesArea.insertAdjacentHTML('beforeend', createTypingIndicatorHTML(typingId));
+      scrollToBottom();
+
+      let fullText = '';
+      try {
+        const payload = {
+          messages: state.chatHistory,
+          model: state.settings.model,
+          temperature: state.settings.temperature,
+          max_tokens: state.settings.maxTokens,
+        };
+
+        if (state.provider === 'bedrock' && state.settings.guardrailId) {
+          payload.guardrail_id = state.settings.guardrailId;
+          payload.guardrail_version = state.settings.guardrailVersion;
+        }
+
+        const res = await fetch(API_BASE_URL + '/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        $(typingId).remove();
+        const aiMsgId = 'ai-msg-' + Date.now();
+        messagesArea.insertAdjacentHTML('beforeend', createAIMessageHTML('', aiMsgId));
+        const contentEl = $(aiMsgId).querySelector('.ai-content');
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop();
+
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            const payload = line.slice(6);
+            if (payload === '[DONE]') break;
+
+            try {
+              const data = JSON.parse(payload);
+              if (data.error) {
+                contentEl.innerHTML = `<div class="p-4 bg-error-container rounded-xl"><span class="text-sm">${escHtml(data.error)}</span></div>`;
+                state.isStreaming = false;
+                return;
+              }
+              if (data.text) {
+                fullText += data.text;
+                contentEl.innerHTML = renderMarkdown(fullText);
+                scrollToBottom();
+              }
+            } catch {}
+          }
+        }
+
+        if (fullText) {
+          state.chatHistory.push({ role: 'assistant', content: fullText });
+          saveCurrentChat();
+        }
+      } catch (err) {
+        const typingEl = $(typingId);
+        if (typingEl) typingEl.remove();
+        showToast('Regeneration failed');
+      }
+
+      state.isStreaming = false;
+    }
+
+
+    // ═══════════════════════════════════════════════════════════════════
+    // ═══════════════════ EVENT LISTENERS ══════════════════════════════
+    // ═══════════════════════════════════════════════════════════════════
+
+    // Sidebar
+    hamburgerBtn.addEventListener('click', () => {
+      sidebar.classList.remove('-translate-x-full');
+      sidebarOverlay.classList.remove('hidden');
+    });
+
+    sidebarOverlay.addEventListener('click', closeSidebar);
+
+    $('close-sidebar-btn').addEventListener('click', closeSidebar);
+
+    function closeSidebar() {
+      sidebar.classList.add('-translate-x-full');
+      sidebarOverlay.classList.add('hidden');
+    }
+
+    newChatBtn.addEventListener('click', () => {
+      createNewChat();
+      if (window.innerWidth < 768) closeSidebar();
+    });
+
+    // Settings Drawer
+    settingsBtn.addEventListener('click', () => {
+      settingsDrawer.classList.toggle('translate-x-full');
+    });
+
+    settingsCloseBtn.addEventListener('click', () => {
+      settingsDrawer.classList.add('translate-x-full');
+    });
+
+    // More Options Dropdown
+    $('more-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      $('more-dropdown').classList.toggle('hidden');
+    });
+
+    document.addEventListener('click', () => {
+      $('more-dropdown').classList.add('hidden');
+    });
+
+    $('export-btn').addEventListener('click', async () => {
+      $('more-dropdown').classList.add('hidden');
+      const chats = loadChats();
+      const active = chats.find(c => c.id === getActiveChatId());
+      if (!active) { showToast('No active chat to export'); return; }
+      try {
+        await fetch(API_BASE_URL + '/api/conversations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(active)
+        });
+        showToast('Chat exported to disk');
+      } catch { showToast('Export failed'); }
+    });
+
+    $('import-btn').addEventListener('click', async () => {
+      $('more-dropdown').classList.add('hidden');
+      try {
+        const res = await fetch(API_BASE_URL + '/api/conversations');
+        const data = await res.json();
+        if (!data.conversations || data.conversations.length === 0) {
+          showToast('No saved conversations on disk');
+          return;
+        }
+        let imported = 0;
+        for (const summary of data.conversations) {
+          const chats = loadChats();
+          if (!chats.find(c => c.id === summary.id)) {
+            const full = await (await fetch(API_BASE_URL + '/api/conversations/' + summary.id)).json();
+            chats.unshift(full);
+            saveChats(chats);
+            imported++;
+          }
+        }
+        if (imported > 0) { renderSidebar(); showToast('Imported ' + imported + ' conversation(s)'); }
+        else showToast('All conversations already imported');
+      } catch { showToast('Import failed'); }
+    });
+
+    $('temperature-slider').addEventListener('input', (e) => {
+      state.settings.temperature = parseFloat(e.target.value);
+      $('temp-value').textContent = state.settings.temperature.toFixed(2);
+      saveSettings();
+    });
+
+    $('max-tokens-slider').addEventListener('input', (e) => {
+      state.settings.maxTokens = parseInt(e.target.value);
+      $('max-tokens-value').textContent = state.settings.maxTokens;
+      saveSettings();
+    });
+
+    $('model-select').addEventListener('change', (e) => {
+      state.settings.model = e.target.value;
+      updateHeader();
+      saveSettings();
+    });
+
+    $('guardrail-id').addEventListener('input', (e) => {
+      state.settings.guardrailId = e.target.value.trim();
+      saveSettings();
+    });
+
+    $('guardrail-version').addEventListener('input', (e) => {
+      state.settings.guardrailVersion = e.target.value.trim();
+      saveSettings();
+    });
+
+    // Chat Input
+    chatInput.addEventListener('input', () => {
+      chatInput.style.height = '44px';
+      chatInput.style.height = Math.min(chatInput.scrollHeight, 128) + 'px';
+      sendBtn.disabled = chatInput.value.trim() === '' || state.isStreaming;
+    });
+
+    chatInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+
+    sendBtn.addEventListener('click', sendMessage);
+
+    // Auth Provider Selection
+    document.querySelectorAll('.provider-card').forEach(card => {
+      card.addEventListener('click', (e) => {
+        if (e.target.closest('input') || e.target.closest('button') || e.target.closest('select')) return;
+
+        const provider = card.id.replace('provider-', '');
+
+        // Reset all cards
+        document.querySelectorAll('.provider-card').forEach(c => {
+          c.classList.remove('border-primary-container');
+          c.classList.add('border-transparent');
+          c.querySelector('[id$="-form"]').classList.add('hidden');
+        });
+
+        // Select this card
+        card.classList.remove('border-transparent');
+        card.classList.add('border-primary-container');
+        $(provider + '-form').classList.remove('hidden');
+      });
+    });
+
+    // Bedrock Tabs
+    document.querySelectorAll('.bedrock-tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tab = btn.dataset.tab;
+        document.querySelectorAll('.bedrock-tab-btn').forEach(b => {
+          b.classList.remove('bg-surface-container', 'text-on-surface');
+          b.classList.add('text-on-surface-variant', 'hover:bg-surface-container-low');
+        });
+        btn.classList.add('bg-surface-container', 'text-on-surface');
+        btn.classList.remove('text-on-surface-variant', 'hover:bg-surface-container-low');
+
+        $('bedrock-api-tab').classList.add('hidden');
+        $('bedrock-sso-tab').classList.add('hidden');
+        $('bedrock-quick-tab').classList.add('hidden');
+        if (tab === 'api') $('bedrock-api-tab').classList.remove('hidden');
+        else if (tab === 'sso') $('bedrock-sso-tab').classList.remove('hidden');
+        else if (tab === 'quick') $('bedrock-quick-tab').classList.remove('hidden');
+      });
+    });
+
+    // Connect Buttons
+    $('bedrock-connect-btn').addEventListener('click', async () => {
+      const activeTab = $('bedrock-tabs').querySelector('.bg-surface-container').dataset.tab;
+
+      if (activeTab === 'sso') {
+        const profile = $('bedrock-sso-profile').value.trim();
+        const region = $('bedrock-sso-region').value.trim() || 'us-east-1';
+        if (!profile) {
+          showAuthError('Please select a profile');
+          return;
+        }
+        await connectSSO(profile, region);
+      } else if (activeTab === 'quick') {
+        const accessKey = $('bedrock-quick-access').value.trim();
+        const secretKey = $('bedrock-quick-secret').value.trim();
+        if (!accessKey || !secretKey) {
+          showAuthError('Access Key and Secret Key are required');
+          return;
+        }
+        await connectProvider('bedrock', { access_key: accessKey, secret_key: secretKey, region: 'us-east-1' });
+      } else {
+        const accessKey = $('bedrock-access-key').value.trim();
+        const secretKey = $('bedrock-secret-key').value.trim();
+        const sessionToken = $('bedrock-session-token').value.trim();
+        const region = $('bedrock-region').value.trim() || 'us-east-1';
+
+        if (!accessKey || !secretKey) {
+          showAuthError('Access Key and Secret Key are required');
+          return;
+        }
+
+        await connectProvider('bedrock', {
+          access_key: accessKey,
+          secret_key: secretKey,
+          session_token: sessionToken || undefined,
+          region
+        });
+      }
+    });
+
+    $('anthropic-connect-btn').addEventListener('click', async () => {
+      const apiKey = $('anthropic-api-key').value.trim();
+      if (!apiKey) {
+        showAuthError('API Key is required');
+        return;
+      }
+      await connectProvider('anthropic', { api_key: apiKey });
+    });
+
+    $('gemini-connect-btn').addEventListener('click', async () => {
+      const apiKey = $('gemini-api-key').value.trim();
+      if (!apiKey) {
+        showAuthError('API Key is required');
+        return;
+      }
+      await connectProvider('gemini', { api_key: apiKey });
+    });
+
+    connectBtn.addEventListener('click', () => {
+      authOverlay.classList.remove('hidden');
+    });
+
+    disconnectBtn.addEventListener('click', disconnect);
+
+    // Message Toolbar Actions
+    messagesArea.addEventListener('click', (e) => {
+      // Copy button
+      const copyBtn = e.target.closest('.copy-btn');
+      if (copyBtn) {
+        const content = copyBtn.closest('[data-role="assistant"]').querySelector('.ai-content');
+        navigator.clipboard.writeText(content.innerText).then(() => {
+          const icon = copyBtn.querySelector('.material-symbols-outlined');
+          icon.textContent = 'check';
+          setTimeout(() => { icon.textContent = 'content_copy'; }, 2000);
+          showToast('Copied to clipboard');
+        });
+        return;
+      }
+
+      // Copy code button
+      const copyCodeBtn = e.target.closest('.copy-code-btn');
+      if (copyCodeBtn) {
+        const code = copyCodeBtn.closest('.code-block').querySelector('code').innerText;
+        navigator.clipboard.writeText(code).then(() => {
+          copyCodeBtn.textContent = 'Copied!';
+          setTimeout(() => { copyCodeBtn.textContent = 'Copy'; }, 2000);
+        });
+        return;
+      }
+
+      // Regenerate button
+      const regenBtn = e.target.closest('.regenerate-btn');
+      if (regenBtn && !state.isStreaming) {
+        regenerateResponse();
+        return;
+      }
+
+      // Thumb buttons
+      const thumbBtn = e.target.closest('.thumb-up-btn, .thumb-down-btn');
+      if (thumbBtn) {
+        const toolbar = thumbBtn.closest('.ai-toolbar');
+        toolbar.querySelectorAll('.thumb-up-btn, .thumb-down-btn').forEach(b => {
+          b.classList.remove('text-primary');
+          b.classList.add('text-on-surface-variant');
+        });
+        thumbBtn.classList.remove('text-on-surface-variant');
+        thumbBtn.classList.add('text-primary');
+        return;
+      }
+
+      // Suggested prompts
+      const promptBtn = e.target.closest('.suggested-prompt');
+      if (promptBtn) {
+        chatInput.value = promptBtn.dataset.prompt;
+        chatInput.focus();
+        sendMessage();
+        return;
+      }
+    });
+
+    // Hide SSO tab if deployed
+    if (!IS_LOCAL) {
+      const ssoTab = $('sso-tab-btn');
+      if (ssoTab) ssoTab.style.display = 'none';
+    }
+
+
+    // ═══════════════════════════════════════════════════════════════════
+    // ═══════════════════════ INITIALIZATION ═══════════════════════════
+    // ═══════════════════════════════════════════════════════════════════
+
+    (async function init() {
+      loadSettings();
+
+      const chats = loadChats();
+      const activeId = getActiveChatId();
+
+      if (activeId && chats.find(c => c.id === activeId)) {
+        switchChat(activeId);
+      } else if (chats.length > 0) {
+        switchChat(chats[0].id);
+      } else {
+        createNewChat();
+      }
+
+      await checkAuth();
+      await fetchProfiles(); // Load SSO profiles for dropdown
+    })();
+  </script>
+</body>
+</html>
