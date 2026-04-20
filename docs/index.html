@@ -203,6 +203,10 @@
       animation: loadingShimmer 2s linear infinite, loadingFill 30s ease-out forwards;
     }
 
+    .loading-progress-bar.phase2 {
+      background: linear-gradient(90deg, #6332e4, #b7a3ff, #6332e4);
+    }
+
     @keyframes loadingShimmer {
       0% { background-position: -200% 0; }
       100% { background-position: 200% 0; }
@@ -223,6 +227,20 @@
     @keyframes statusPulse {
       0%, 100% { opacity: 0.5; }
       50% { opacity: 1; }
+    }
+
+    .loading-phase2-bg {
+      background: rgba(20, 10, 40, 0.9) !important;
+    }
+
+    .loading-icon-phase2 {
+      background: linear-gradient(135deg, #6332e4, #b7a3ff) !important;
+      animation: iconFloat 3s ease-in-out infinite;
+    }
+
+    @keyframes iconFloat {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-6px); }
     }
 
     /* ═══ Glass Morphism ═══ */
@@ -520,10 +538,10 @@
   <!-- ══════════════════ LOADING OVERLAY ═══════════════════════════════ -->
   <!-- ═══════════════════════════════════════════════════════════════════ -->
 
-  <div id="loading-overlay" class="fixed inset-0 overlay-bg z-[60] flex items-center justify-center p-4">
+  <div id="loading-overlay" class="fixed inset-0 z-[60] flex items-center justify-center p-4 transition-all duration-1000" style="background: rgba(6, 14, 32, 0.85); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);">
     <div class="text-center max-w-md w-full">
       <!-- Logo & Title -->
-      <div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-primary to-primary-container flex items-center justify-center shadow-xl">
+      <div id="loading-icon" class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-primary to-primary-container flex items-center justify-center shadow-xl transition-all duration-700">
         <span class="material-symbols-outlined text-white text-[32px]" style="font-variation-settings: 'FILL' 1;">cloud</span>
       </div>
       <h2 class="font-headline font-bold text-2xl text-white mb-6">CloudChat</h2>
@@ -533,11 +551,11 @@
         <div id="loading-progress" class="h-full rounded-full loading-progress-bar"></div>
       </div>
 
-      <!-- Rotating Tips -->
-      <div class="mb-6 min-h-[72px] flex flex-col items-center justify-center">
-        <p class="text-primary-container font-headline font-semibold text-sm mb-2 flex items-center gap-2">
-          <span class="material-symbols-outlined text-[16px]">lightbulb</span>
-          Did you know?
+      <!-- Phase 1: Tips (first ~15s) -->
+      <div id="loading-phase1" class="mb-6 min-h-[80px] flex flex-col items-center justify-center transition-opacity duration-500">
+        <p id="loading-section-label" class="font-headline font-semibold text-sm mb-2 flex items-center gap-2 transition-all duration-500 text-primary-container">
+          <span id="loading-section-icon" class="material-symbols-outlined text-[16px]">lightbulb</span>
+          <span id="loading-section-text">Did you know?</span>
         </p>
         <p id="loading-tip" class="text-white/80 font-body text-sm leading-relaxed transition-opacity duration-500 px-4"></p>
       </div>
@@ -680,7 +698,7 @@
     // ═══════════════════ LOADING SCREEN TIPS ══════════════════════════
     // ═══════════════════════════════════════════════════════════════════
 
-    const LOADING_TIPS = [
+    const LOADING_PHASE1_TIPS = [
       "CloudChat supports 5+ AI providers — OpenAI, Anthropic, Google, NVIDIA & more.",
       "Switch between AI models mid-conversation to compare responses.",
       "Your conversations are stored locally — your data stays with you.",
@@ -689,9 +707,20 @@
       "CloudChat is open source — built with passion, not a budget."
     ];
 
+    const LOADING_PHASE2_TIPS = [
+      "Adjust temperature and token limits in the settings panel for fine-tuned responses.",
+      "AWS Bedrock users can attach guardrails to filter unsafe content automatically.",
+      "Export your conversations to disk so you never lose an important thread.",
+      "Each provider has different strengths — Claude excels at reasoning, Gemini at search.",
+      "You can start a new chat anytime without losing your previous conversations.",
+      "CloudChat works on mobile too — try it on your phone for on-the-go AI."
+    ];
+
     const LOADING_STATUSES = [
       "Waking up the server...",
+      "Brewing some intelligence...",
       "Warming up the AI engines...",
+      "Neurons firing up...",
       "Almost there..."
     ];
 
@@ -699,33 +728,70 @@
     let loadingStatusIndex = 0;
     let tipInterval = null;
     let statusInterval = null;
+    let phaseTimeout = null;
+    let loadingPhase = 1;
 
     function startLoadingAnimations() {
       const tipEl = $('loading-tip');
       const statusEl = $('loading-status-text');
       if (!tipEl || !statusEl) return;
 
-      tipEl.textContent = LOADING_TIPS[0];
+      loadingPhase = 1;
+      loadingTipIndex = 0;
+      loadingStatusIndex = 0;
+      tipEl.textContent = LOADING_PHASE1_TIPS[0];
       tipEl.style.opacity = '1';
 
       tipInterval = setInterval(() => {
         tipEl.style.opacity = '0';
         setTimeout(() => {
-          loadingTipIndex = (loadingTipIndex + 1) % LOADING_TIPS.length;
-          tipEl.textContent = LOADING_TIPS[loadingTipIndex];
+          const tips = loadingPhase === 1 ? LOADING_PHASE1_TIPS : LOADING_PHASE2_TIPS;
+          loadingTipIndex = (loadingTipIndex + 1) % tips.length;
+          tipEl.textContent = tips[loadingTipIndex];
           tipEl.style.opacity = '1';
         }, 500);
-      }, 5000);
+      }, 4000);
 
       statusInterval = setInterval(() => {
         loadingStatusIndex = (loadingStatusIndex + 1) % LOADING_STATUSES.length;
         statusEl.textContent = LOADING_STATUSES[loadingStatusIndex];
-      }, 8000);
+      }, 6000);
+
+      phaseTimeout = setTimeout(() => switchToPhase2(), 15000);
+    }
+
+    function switchToPhase2() {
+      loadingPhase = 2;
+      loadingTipIndex = 0;
+
+      const overlay = $('loading-overlay');
+      const icon = $('loading-icon');
+      const progress = $('loading-progress');
+      const sectionLabel = $('loading-section-label');
+      const sectionIcon = $('loading-section-icon');
+      const sectionText = $('loading-section-text');
+      const tipEl = $('loading-tip');
+
+      overlay.classList.add('loading-phase2-bg');
+      icon.classList.add('loading-icon-phase2');
+      progress.classList.add('phase2');
+
+      sectionLabel.classList.remove('text-primary-container');
+      sectionLabel.classList.add('text-tertiary-container');
+      sectionIcon.textContent = 'rocket_launch';
+      sectionText.textContent = 'While you wait...';
+
+      tipEl.style.opacity = '0';
+      setTimeout(() => {
+        tipEl.textContent = LOADING_PHASE2_TIPS[0];
+        tipEl.style.opacity = '1';
+      }, 500);
     }
 
     function stopLoadingAnimations() {
       if (tipInterval) { clearInterval(tipInterval); tipInterval = null; }
       if (statusInterval) { clearInterval(statusInterval); statusInterval = null; }
+      if (phaseTimeout) { clearTimeout(phaseTimeout); phaseTimeout = null; }
     }
 
     const sidebar = $('sidebar');
